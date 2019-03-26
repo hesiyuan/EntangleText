@@ -35,11 +35,13 @@ var (
 	End   = []Identifier{{^uint16(0), 0}}
 )
 
-// New creates a new Documentument containing the given content.
-func New(content []string, clientID uint8) *Document {
-	d := &Document{clientID: clientID}
-	d.Insert(Start, "")
-	d.Insert(End, "")
+// New creates a new Document containing the given content and a clientID
+func NewDocument(content []string, clientID uint8) *Document {
+	d := &Document{clientID: clientID} // local variable? stored in stack?
+	// Note that, unlike in C, it's perfectly OK to return the address of a local variable;
+	// the storage associated with the variable survives after the function returns.
+	d.insert(Start, "")
+	d.insert(End, "")
 	for _, c := range content {
 		// End will always exist.
 		d.InsertLeft(End, c)
@@ -109,23 +111,61 @@ func (d *Document) Get(p []Identifier) (string, bool) {
 }
 
 // Insert a new pair at the position, returning success or failure (already existing
-// position).
-func (d *Document) Insert(p []Identifier, atom string) bool {
+// position). Note that atom is a single byte to insert
+func (d *Document) insert(p []Identifier, atom string) bool {
 	i, exists := d.Index(p)
 	if exists {
 		return false
 	}
+	// this is harmful for rach condition
 	d.pairs = append(d.pairs[0:i], append([]pair{{p, atom}}, d.pairs[i:]...)...)
 	return true
 }
 
+// Given a position identifier, inserts a byte array to the right of the given position
+// Note that this may insert multiple bytes. And it is only local insert
+// This function is not efficient, as insertRight calls insert which uses append
+// will need to be rewritten to use only a single append
+func (d *Document) insertMultiple(p []Identifier, value []byte) bool {
+	if len(value) < 1 {
+		return false
+	}
+
+	np, success := d.InsertRight(p, string(value[0]))
+	if !success {
+		return false
+	}
+	// CRDT treats every character as the same, no need to split on return
+	for i := 1; i < len(value); i++ { // go through each byte in value[]
+		// notice that the 1st argument to InsertRight is now updated np
+		np, success = d.InsertRight(np, string(value[i]))
+		if !success {
+			return false
+		}
+	}
+
+	return true
+}
+
 // Delete the pair at the position, returning success or failure (non-existent position).
-func (d *Document) Delete(p []Identifier) bool {
+func (d *Document) delete(p []Identifier) bool {
 	i, exists := d.Index(p)
 	if !exists || i == 0 || i == len(d.pairs)-1 {
 		return false
 	}
 	d.pairs = append(d.pairs[0:i], d.pairs[i+1:]...)
+	return true
+}
+
+// Delete pairs starting at startIndex and up to endIndex
+// later will need to construct a list of position identifiers deleted to be transmitted
+func (d *Document) deleteMultiple(startIndex, endIndex int) bool {
+
+	if startIndex == 0 || endIndex == len(d.pairs)-1 { // cannot delete Start and End
+		return false
+	}
+
+	d.pairs = append(d.pairs[0:startIndex], d.pairs[endIndex:]...)
 	return true
 }
 
@@ -163,43 +203,47 @@ func random(x, y uint16) uint16 {
 // are equal, or the left is greater than right, position cannot be generated).
 // Later will be optimized if time permits to LSEQ
 func GeneratePos(lp, rp []Identifier, site uint8) ([]Identifier, bool) {
-	if ComparePos(lp, rp) != -1 {
+	if ComparePos(lp, rp) != -1 { // lp should be less than rp
 		return nil, false
 	}
 	p := []Identifier{}
-	for i := 0; i < len(lp); i++ {
+	for i := 0; i < len(lp); i++ { // why len(lp)? could be len(rp)
 		l := lp[i]
 		r := rp[i]
 		if l.Ident == r.Ident && l.Site == r.Site {
 			p = append(p, Identifier{l.Ident, l.Site})
 			continue
 		}
-		if d := r.Ident - l.Ident; d > 1 {
+		if d := r.Ident - l.Ident; d > 1 { // there are spaces in this level
 			r := random(l.Ident, r.Ident)
 			p = append(p, Identifier{r, site})
-		} else if d == 1 {
-			if site > l.Site {
+		} else if d == 1 { // no space in this level
+			if site > l.Site { // if site is larger, TOTest:
 				p = append(p, Identifier{l.Ident, site})
 			} else if site < r.Site {
 				p = append(p, Identifier{r.Ident, site})
-			} else {
+			} else { // we now that rp[i] - lp[i] == 1 in this case, go through rest of lp to find a place to generate
+				// if lp[i+1] does not exist, then min := 0, else
 				min := uint16(0)
-				if len(lp) > len(rp) {
+				if len(lp) > i+1 {
+					min = lp[i+1].Ident // this should be lp[i+1].Ident
+				} // TODO: edge case need to check if min = max - 1
+				if len(lp) > len(rp) { // long lp, hard case
 					min = lp[len(rp)].Ident
 					// Super edge case
 					// left  => {3 1} {65534 1}
-					// right => {4 1}
+					// right => {4 1}. some optimization can be made here, but stick it for now
 					// In this case, 65534 can't be min, because no number is in between
 					// it and MAX. So need to extend the positions further.
-					if min == ^uint16(0)-1 {
+					if min == ^uint16(0)-1 { // maxium is 65535, no space in lp's last level
 						r := random(0, ^uint16(0))
-						p = append(p, Identifier{l.Ident, l.Site})
+						p = append(p, Identifier{l.Ident, l.Site}) // append previous
 						p = append(p, lp[len(rp):]...)
 						p = append(p, Identifier{r, site})
 						return p, true
 					}
-				}
-				r := random(min, ^uint16(0))
+				} // lp is shorter
+				r := random(min, ^uint16(0)) // if min = ^uint16(0) - 1, then, need to append one more
 				p = append(p, Identifier{l.Ident, l.Site}, Identifier{r, site})
 			}
 		} else {
@@ -212,13 +256,14 @@ func GeneratePos(lp, rp []Identifier, site uint8) ([]Identifier, bool) {
 		}
 		return p, true
 	}
-	if len(rp) > len(lp) {
+	if len(rp) > len(lp) { // easy case, make a random integer in new level
 		r := random(0, rp[len(lp)].Ident)
 		p = append(p, Identifier{r, site})
 	}
 	return p, true
 }
 
+// use this one when insert
 // GeneratePos generates a new position identifier between the two positions provided.
 // Secondary return value indicates whether it was successful (when the two positions
 // are equal, or the left is greater than right, position cannot be generated).
@@ -240,7 +285,7 @@ func (d *Document) InsertLeft(p []Identifier, atom string) ([]Identifier, bool) 
 	if !success {
 		return nil, false
 	}
-	return np, d.Insert(np, atom)
+	return np, d.insert(np, atom)
 }
 
 // InsertRight inserts the atom to the right of the given position, returning the inserted
@@ -251,11 +296,11 @@ func (d *Document) InsertRight(p []Identifier, atom string) ([]Identifier, bool)
 	if !success {
 		return nil, false
 	}
-	np, success := d.GeneratePos(p, rp)
+	np, success := d.GeneratePos(p, rp) // generate a position identifier between p and rp
 	if !success {
 		return nil, false
 	}
-	return np, d.Insert(np, atom)
+	return np, d.insert(np, atom)
 }
 
 // DeleteLeft deletes the atom to the left of the given position, returning whether it
@@ -266,7 +311,7 @@ func (d *Document) DeleteLeft(p []Identifier) bool {
 	if !success {
 		return false
 	}
-	return d.Delete(lp)
+	return d.delete(lp)
 }
 
 // DeleteRight deletes the atom to the right of the given position, returning whether it
@@ -277,7 +322,7 @@ func (d *Document) DeleteRight(p []Identifier) bool {
 	if !success {
 		return false
 	}
-	return d.Delete(rp)
+	return d.delete(rp)
 }
 
 // Content of the entire Documentument.
