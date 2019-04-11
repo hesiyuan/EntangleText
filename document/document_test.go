@@ -60,3 +60,62 @@ func TestGenerationPos(t *testing.T) {
 	assert.Equal(t, ComparePos(lp, p), int8(-1)) // p should be greater than lp
 	assert.Equal(t, ComparePos(p, rp), int8(-1))
 }
+
+func TestGenerationPosLeftInsertion(t *testing.T) {
+	clientID := uint8(68)
+	lp := []Identifier{ // long lp case
+		{56, 68},
+		{31603, 68},
+	}
+
+	rp := []Identifier{
+		{56, 68},
+		{31603, 68},
+		{1, 68},
+	}
+
+	p, _ := GeneratePos(lp, rp, clientID) // p will be extended, though we don't have to
+
+	assert.Equal(t, ComparePos(lp, p), int8(-1)) // p should be greater than lp
+	assert.Equal(t, ComparePos(p, rp), int8(-1))
+}
+
+func TestGenerationPosEqualLengthHasSpaces(t *testing.T) {
+	clientID := uint8(68)
+	lp := []Identifier{ // long lp case
+		{56, 68},
+		{31603, 68},
+		{15, 68},
+	}
+
+	rp := []Identifier{
+		{56, 68},
+		{31603, 68},
+		{278, 68},
+	}
+
+	p, _ := GeneratePos(lp, rp, clientID) // p will be extended, though we don't have to
+
+	assert.Equal(t, ComparePos(lp, p), int8(-1)) // p should be greater than lp
+	assert.Equal(t, ComparePos(p, rp), int8(-1))
+}
+
+func TestGenerationPosEqualLengthNoSpaces(t *testing.T) {
+	clientID := uint8(68)
+	lp := []Identifier{ // long lp case
+		{56, 68},
+		{31603, 68},
+		{15, 68},
+	}
+
+	rp := []Identifier{
+		{56, 68},
+		{31603, 68},
+		{16, 68},
+	}
+
+	p, _ := GeneratePos(lp, rp, clientID) // p will be extended, though we don't have to
+
+	assert.Equal(t, ComparePos(lp, p), int8(-1)) // p should be greater than lp
+	assert.Equal(t, ComparePos(p, rp), int8(-1))
+}

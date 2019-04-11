@@ -243,7 +243,11 @@ func GeneratePos(lp, rp []Identifier, site uint8) ([]Identifier, bool) {
 						p = append(p, Identifier{r, site})
 						return p, true
 					}
-				} // lp is shorter
+				} else if len(lp) < len(rp) { // lp is shorter
+					// lp is shorter
+					fmt.Println("lp is shorter case")
+				}
+
 				r := random(min, ^uint16(0)) // if min = ^uint16(0) - 1, then, need to append one more
 				p = append(p, Identifier{l.Ident, l.Site}, Identifier{r, site})
 			}
@@ -251,28 +255,29 @@ func GeneratePos(lp, rp []Identifier, site uint8) ([]Identifier, bool) {
 			if site > l.Site && site < r.Site { //good case of three peers
 				p = append(p, Identifier{l.Ident, site})
 			} else {
-				min := lp[i+1].Ident
-				if min == ^uint16(0)-1 {
-					// TODO: special cases where there are no spaces oin this level
-					// which basically means we need to extend positions further
-					if len(lp) > len(rp) { // long lp, hard case
-						min = lp[len(rp)].Ident
-						// Super edge case
-						// left  => {3 1} {65534 1}
-						// right => {4 1}. some optimization can be made here, but stick it for now
-						// In this case, 65534 can't be min, because no number is in between
-						// it and MAX. So need to extend the positions further.
-						if min == ^uint16(0)-1 { // maxium is 65535, no space in lp's last level
-							r := random(0, ^uint16(0))
-							p = append(p, Identifier{l.Ident, l.Site}) // append previous
-							p = append(p, lp[len(rp):]...)             // append remaining of lp
-							p = append(p, Identifier{r, site})
-							return p, true
-						}
-					} else {
-						// lp is shorter
-						fmt.Println("lp is shorter case")
+				min := uint16(0)
+				if len(lp) > i+1 {
+					min = lp[i+1].Ident // this should be lp[i+1].Ident
+				} // TODO: edge case need to check if min = max - 1
+				// special cases where there are no spaces oin this level
+				// which basically means we need to extend positions further
+				if len(lp) > len(rp) { // long lp, hard case
+					min = lp[len(rp)].Ident
+					// Super edge case
+					// left  => {3 1} {65534 1}
+					// right => {4 1}. some optimization can be made here, but stick it for now
+					// In this case, 65534 can't be min, because no number is in between
+					// it and MAX. So need to extend the positions further.
+					if min == ^uint16(0)-1 { // maxium is 65535, no space in lp's last level
+						r := random(0, ^uint16(0))
+						p = append(p, Identifier{l.Ident, l.Site}) // append previous
+						p = append(p, lp[len(rp):]...)             // append remaining of lp
+						p = append(p, Identifier{r, site})
+						return p, true
 					}
+				} else if len(lp) < len(rp) {
+					// lp is shorter
+					fmt.Println("lp is shorter case")
 				}
 				r := random(min, ^uint16(0)) // changed from random(0, ^uint16(0))
 				p = append(p, Identifier{l.Ident, l.Site}, Identifier{r, site})
@@ -281,8 +286,14 @@ func GeneratePos(lp, rp []Identifier, site uint8) ([]Identifier, bool) {
 		}
 		return p, true
 	}
+	var r uint16
 	if len(rp) > len(lp) { // easy case, make a random integer in new level
-		r := random(0, rp[len(lp)].Ident)
+		// TODO: need to account for cases where rp[len(lp)].Ident == 1
+		if rp[len(lp)].Ident == 1 {
+			r = 0
+		} else {
+			r = random(0, rp[len(lp)].Ident)
+		}
 		p = append(p, Identifier{r, site})
 	}
 	return p, true
