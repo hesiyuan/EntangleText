@@ -2,6 +2,7 @@ package document
 
 import (
 	"bytes"
+	"fmt"
 	"math/rand"
 )
 
@@ -210,7 +211,7 @@ func GeneratePos(lp, rp []Identifier, site uint8) ([]Identifier, bool) {
 	for i := 0; i < len(lp); i++ { // why len(lp)? could be len(rp)
 		l := lp[i]
 		r := rp[i]
-		if l.Ident == r.Ident && l.Site == r.Site {
+		if l.Ident == r.Ident && l.Site == r.Site { //all same, append
 			p = append(p, Identifier{l.Ident, l.Site})
 			continue
 		}
@@ -247,11 +248,35 @@ func GeneratePos(lp, rp []Identifier, site uint8) ([]Identifier, bool) {
 				p = append(p, Identifier{l.Ident, l.Site}, Identifier{r, site})
 			}
 		} else {
-			if site > l.Site && site < r.Site {
+			if site > l.Site && site < r.Site { //good case of three peers
 				p = append(p, Identifier{l.Ident, site})
 			} else {
-				r := random(0, ^uint16(0))
+				min := lp[i+1].Ident
+				if min == ^uint16(0)-1 {
+					// TODO: special cases where there are no spaces oin this level
+					// which basically means we need to extend positions further
+					if len(lp) > len(rp) { // long lp, hard case
+						min = lp[len(rp)].Ident
+						// Super edge case
+						// left  => {3 1} {65534 1}
+						// right => {4 1}. some optimization can be made here, but stick it for now
+						// In this case, 65534 can't be min, because no number is in between
+						// it and MAX. So need to extend the positions further.
+						if min == ^uint16(0)-1 { // maxium is 65535, no space in lp's last level
+							r := random(0, ^uint16(0))
+							p = append(p, Identifier{l.Ident, l.Site}) // append previous
+							p = append(p, lp[len(rp):]...)             // append remaining of lp
+							p = append(p, Identifier{r, site})
+							return p, true
+						}
+					} else {
+						// lp is shorter
+						fmt.Println("lp is shorter case")
+					}
+				}
+				r := random(min, ^uint16(0)) // changed from random(0, ^uint16(0))
 				p = append(p, Identifier{l.Ident, l.Site}, Identifier{r, site})
+
 			}
 		}
 		return p, true

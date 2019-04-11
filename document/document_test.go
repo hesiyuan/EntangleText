@@ -43,15 +43,16 @@ func TestGenerationPosLongLp(t *testing.T) {
 }
 
 func TestGenerationPos(t *testing.T) {
-	clientID := uint8(1)
+	clientID := uint8(68)
 	lp := []Identifier{ // long lp case
-		{13627, 1},
-		{65534, 1},
-		{24224, 1},
+		{65534, 68},
+		{48896, 57},
+		{65534, 68},
 	}
 
 	rp := []Identifier{
-		{13628, 1},
+		{65534, 68},
+		{48896, 68},
 	}
 
 	p, _ := GeneratePos(lp, rp, clientID) // p will be extended, though we don't have to
