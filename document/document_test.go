@@ -119,3 +119,114 @@ func TestGenerationPosEqualLengthNoSpaces(t *testing.T) {
 	assert.Equal(t, ComparePos(lp, p), int8(-1)) // p should be greater than lp
 	assert.Equal(t, ComparePos(p, rp), int8(-1))
 }
+
+func TestGenerationAnother(t *testing.T) {
+	clientID := uint8(68)
+	lp := []Identifier{ // long lp case
+		{56, 68},
+		{31603, 68},
+		{65534, 68},
+	}
+
+	rp := []Identifier{
+		{56, 68},
+		{31603, 68},
+		{65535, 68},
+	}
+
+	p, _ := GeneratePos(lp, rp, clientID) // p will be extended, though we don't have to
+
+	assert.Equal(t, ComparePos(lp, p), int8(-1)) // p should be greater than lp
+	assert.Equal(t, ComparePos(p, rp), int8(-1))
+}
+
+func TestGenerationSpecial(t *testing.T) {
+	clientID := uint8(68)
+	lp := []Identifier{ // long lp case
+		{6623, 68},
+		{65534, 68},
+	}
+
+	rp := []Identifier{
+		{6624, 68},
+		{62098, 68},
+	}
+
+	p, _ := GeneratePos(lp, rp, clientID) // p will be extended, though we don't have to
+
+	assert.Equal(t, ComparePos(lp, p), int8(-1)) // p should be greater than lp
+	assert.Equal(t, ComparePos(p, rp), int8(-1))
+}
+
+func TestGenerationSpecial2(t *testing.T) {
+	clientID := uint8(68)
+	lp := []Identifier{ // long lp case
+		{6623, 68},
+		{65534, 68},
+	}
+
+	rp := []Identifier{
+		{6623, 68},
+		{65535, 68},
+	}
+
+	p, _ := GeneratePos(lp, rp, clientID) // p will be extended, though we don't have to
+
+	assert.Equal(t, ComparePos(lp, p), int8(-1)) // p should be greater than lp
+	assert.Equal(t, ComparePos(p, rp), int8(-1))
+}
+
+func TestGenerationLongRP(t *testing.T) {
+	clientID := uint8(68)
+	lp := []Identifier{ // long lp case
+		{0, 68},
+	}
+
+	rp := []Identifier{
+		{0, 68},
+		{0, 68},
+		{2, 68},
+	}
+
+	for {
+
+		p, _ := GeneratePos(lp, rp, clientID) // p will be extended, though we don't have to
+
+		fmt.Println("p: ")
+		for _, e := range p {
+
+			fmt.Printf("{")
+			fmt.Print(e.Ident)
+			fmt.Print(", ")
+			fmt.Print(e.Site)
+			fmt.Printf("},")
+			fmt.Printf("\n")
+		}
+
+		fmt.Println("lp: ")
+		for _, e := range lp {
+
+			fmt.Printf("{")
+			fmt.Print(e.Ident)
+			fmt.Print(", ")
+			fmt.Print(e.Site)
+			fmt.Printf("},")
+			fmt.Printf("\n")
+		}
+
+		fmt.Println("rp: ")
+		for _, e := range rp {
+
+			fmt.Printf("{")
+			fmt.Print(e.Ident)
+			fmt.Print(", ")
+			fmt.Print(e.Site)
+			fmt.Printf("},")
+			fmt.Printf("\n")
+		}
+		assert.Equal(t, ComparePos(lp, p), int8(-1)) // p should be greater than lp
+		assert.Equal(t, ComparePos(p, rp), int8(-1))
+
+		rp = p
+	}
+}

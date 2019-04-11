@@ -247,8 +247,14 @@ func GeneratePos(lp, rp []Identifier, site uint8) ([]Identifier, bool) {
 					// lp is shorter
 					fmt.Println("lp is shorter case")
 				}
-
-				r := random(min, ^uint16(0)) // if min = ^uint16(0) - 1, then, need to append one more
+				// need to take in account the case of min = ^uint16(0) - 1
+				var r uint16
+				if min == ^uint16(0)-1 {
+					r = ^uint16(0)
+				} else {
+					r = random(min, ^uint16(0))
+				}
+				//r := random(min, ^uint16(0)) // if min = ^uint16(0) - 1, then, need to append one more
 				p = append(p, Identifier{l.Ident, l.Site}, Identifier{r, site})
 			}
 		} else {
@@ -271,7 +277,7 @@ func GeneratePos(lp, rp []Identifier, site uint8) ([]Identifier, bool) {
 					if min == ^uint16(0)-1 { // maxium is 65535, no space in lp's last level
 						r := random(0, ^uint16(0))
 						p = append(p, Identifier{l.Ident, l.Site}) // append previous
-						p = append(p, lp[len(rp):]...)             // append remaining of lp
+						p = append(p, lp[len(rp):]...)
 						p = append(p, Identifier{r, site})
 						return p, true
 					}
@@ -279,7 +285,15 @@ func GeneratePos(lp, rp []Identifier, site uint8) ([]Identifier, bool) {
 					// lp is shorter
 					fmt.Println("lp is shorter case")
 				}
-				r := random(min, ^uint16(0)) // changed from random(0, ^uint16(0))
+
+				// need to take in account the case of min = ^uint16(0) - 1
+				var r uint16
+				if min == ^uint16(0)-1 {
+					r = ^uint16(0)
+				} else {
+					r = random(min, ^uint16(0))
+				}
+
 				p = append(p, Identifier{l.Ident, l.Site}, Identifier{r, site})
 
 			}
@@ -289,12 +303,24 @@ func GeneratePos(lp, rp []Identifier, site uint8) ([]Identifier, bool) {
 	var r uint16
 	if len(rp) > len(lp) { // easy case, make a random integer in new level
 		// TODO: need to account for cases where rp[len(lp)].Ident == 1
-		if rp[len(lp)].Ident == 1 {
-			r = 0
-		} else {
-			r = random(0, rp[len(lp)].Ident)
+		for i := len(lp); i < len(rp); i++ {
+			if rp[i].Ident == 1 {
+				r = 0
+				p = append(p, Identifier{r, site})
+				r := random(0, ^uint16(0))
+				p = append(p, Identifier{r, site})
+				return p, true
+			} else if rp[i].Ident == 0 {
+				// just append all the identifiers except the last
+				p = append(p, rp[i])
+				continue
+			} else {
+				r = random(0, rp[i].Ident)
+				p = append(p, Identifier{r, site})
+				return p, true
+			}
+			//p = append(p, Identifier{r, site})
 		}
-		p = append(p, Identifier{r, site})
 	}
 	return p, true
 }
